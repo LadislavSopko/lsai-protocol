@@ -98,7 +98,7 @@ A Tier 1 plugin is useful. A Tier 3 plugin is transformative — `impact` alone 
 
 | Property | Value |
 |----------|-------|
-| **Project** | [VS-MCP](https://github.com/nickvane/vs-mcp) — Visual Studio MCP Server |
+| **Project** | VS-MCP — Visual Studio MCP Server (private, by Nico van Etten) |
 | **Tier** | 3 (full semantic analysis) |
 | **Language** | C# (via Visual Studio Roslyn integration) |
 | **Tools** | 20 tools (superset of LSAI — includes file navigation, formatting) |
