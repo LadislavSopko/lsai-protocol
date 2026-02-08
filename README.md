@@ -29,14 +29,24 @@ LSP was designed for IDEs — cursor-centric, single-file, chatty. AI agents nee
 |-----------|---------------------|------|
 | **Round-trips for "who calls X and what tests cover it?"** | 5-8 calls (hover + definition + references + call hierarchy + symbol search) | 1 call (`impact`) |
 | **Data per response** | Cursor-position hover text, raw JSON spans | Full signatures, code context, grouped by file |
-| **Token efficiency** | ~1,900 tokens for a typical query | ~270 tokens for the same query |
 | **Path format** | Absolute URIs (`file:///home/user/project/src/...`) | Relative paths (`src/Services/MyService.cs`) |
 | **Output format** | Verbose JSON with TextEdit ranges, Position objects | Compact, AI-native (format-agnostic) |
 | **Capabilities** | Varies by server, no standard capability tiers | Declared tiers (1/2/3) per plugin |
 | **Composite queries** | Not supported — client must orchestrate | Built-in (`impact` = usages + callers + tests) |
 | **Multi-language** | One server per language | Plugin architecture, one endpoint |
 
-**Measured token savings: 86%** (1,895 → 273 tokens on real-world queries against a 73-project C# solution).
+### Measured: Grep/Read vs LSAI-style semantic tools
+
+Real measurements on the Zerox.Lsai codebase (7 C# projects, 313 tests), comparing standard AI agent tools (Grep + Read) against VS-MCP semantic tools. Same queries, same codebase, same session.
+
+| Operation | Grep/Read (standard AI tools) | LSAI-style (VS-MCP) | Char savings | Call savings |
+|-----------|-------------------------------|----------------------|:------------:|:-----------:|
+| **Find symbol** `WorkspaceSessionManager` | 696 chars, 5 results (3 noise from .md files) | 133 chars, 1 precise result | **81%** | 1 call vs 1 call (but 100% precision) |
+| **Find all usages** (48 refs) | 7,027 chars, 52 lines, absolute paths, text match | 2,189 chars, 48 usages, relative paths, grouped by scope | **69%** | 1 vs 1 (but semantic, no false positives) |
+| **Understand a class** (outline) | 3,865 chars: Grep to find file + Read entire file | 556 chars: structured outline with members and types | **86%** | 2 calls vs 1 call |
+| **Find callers** of `OpenAsync` | 3,361 chars from Grep + need 5-10 Read calls to verify actual call sites | 1,973 chars, 16 semantic callers with Type.Method + file:line | **41-70%** | 5-10 calls vs 1 call |
+
+**Average char savings: 69-81%.** But the real win is precision and fewer round-trips — Grep returns text matches (including comments, strings, markdown), LSAI returns compiler-verified semantic references.
 
 ---
 
