@@ -180,7 +180,7 @@ To implement an LSAI-compliant server:
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+Protocol specification licensed under **CC BY-NC 4.0**. Free for study, research, and non-commercial use. Commercial implementations require a separate license — contact ladislav.sopko@gmail.com
 
 ---
 

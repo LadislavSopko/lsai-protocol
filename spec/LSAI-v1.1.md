@@ -685,7 +685,7 @@ AI Agent ──MCP──> LSAI Server ──native/lsp──> Compiler / Languag
 
 ## License
 
-Protocol specification: MIT. Anyone can implement LSAI-compliant tools.
+Protocol specification licensed under CC BY-NC 4.0. Free for study, research, and non-commercial use. Commercial implementations require a separate license — contact ladislav.sopko@gmail.com
 
 ---
 
