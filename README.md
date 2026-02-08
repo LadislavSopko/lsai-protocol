@@ -98,7 +98,7 @@ A Tier 1 plugin is useful. A Tier 3 plugin is transformative — `impact` alone 
 
 | Property | Value |
 |----------|-------|
-| **Project** | VS-MCP — Visual Studio MCP Server (private, by Nico van Etten) |
+| **Project** | [VS-MCP](https://github.com/LadislavSopko/zerox-msvc-info) — Visual Studio MCP Server |
 | **Tier** | 3 (full semantic analysis) |
 | **Language** | C# (via Visual Studio Roslyn integration) |
 | **Tools** | 20 tools (superset of LSAI — includes file navigation, formatting) |
@@ -113,7 +113,7 @@ VS-MCP is the production system that validated LSAI's core thesis: compiler sema
 
 | Property | Value |
 |----------|-------|
-| **Project** | [Zerox.Lsai](https://github.com/LadislavSopko/zerox-msvc-info) — standalone LSAI server |
+| **Project** | Zerox.Lsai — standalone LSAI server |
 | **Tier** | 3 |
 | **Languages** | C# (Roslyn plugin), extensible via plugin architecture |
 | **Transport** | HTTP (Streamable HTTP via MCP SDK) |
