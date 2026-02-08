@@ -113,7 +113,7 @@ VS-MCP is the production system that validated LSAI's core thesis: compiler sema
 
 | Property | Value |
 |----------|-------|
-| **Project** | Zerox.Lsai — standalone LSAI server |
+| **Project** | [Zerox.Lsai](https://github.com/LadislavSopko/Roslyn.Poc) — standalone LSAI server |
 | **Tier** | 3 |
 | **Languages** | C# (Roslyn plugin), extensible via plugin architecture |
 | **Transport** | HTTP (Streamable HTTP via MCP SDK) |
