@@ -8,7 +8,7 @@
 
 ## Abstract
 
-LSAI is a protocol for AI consumption of compiler-semantic intelligence. It defines **11 semantic tools**, their **data contracts**, a **plugin capability system**, and **6 output format profiles** — enabling multi-language semantic analysis through a single MCP endpoint.
+LSAI is a protocol for AI consumption of compiler-semantic intelligence. It defines **12 semantic tools**, their **data contracts**, a **plugin capability system**, and **6 output format profiles** — enabling multi-language semantic analysis through a single MCP endpoint.
 
 Unlike LSP (designed for IDEs), LSAI optimizes for:
 - **Data richness per token** — full signatures, code context, composite queries
@@ -77,7 +77,7 @@ Even vs semantically correct Raw LSP JSON, LSAI's compact formats save:
 
 ### Naming Convention
 
-Semantic tools use short names: `search`, `info`, `usages`, `callers`, `callees`, `hierarchy`, `impact`, `rename`, `diagnostics`, `outline`, `deps`.
+Semantic tools use short names: `search`, `info`, `usages`, `callers`, `callees`, `hierarchy`, `impact`, `rename`, `diagnostics`, `outline`, `deps`, `source`.
 
 MCP tool names are prefixed with `lsai_`: `lsai_search`, `lsai_info`, etc.
 
@@ -552,6 +552,70 @@ EFine.sln (5 projects)
 
 ---
 
+### Tool 12: `source`
+
+Get source code of a specific symbol. Use after `search` to inspect implementation details without reading entire files.
+
+**Motivation:** When an AI agent finds a symbol via `search`, it typically needs to see the implementation. Without `source`, the agent must read the entire file — wasting tokens on imports, comments, and unrelated code. With `source`, the agent gets only the relevant symbol body.
+
+This tool is especially valuable when the AI has no direct file access (e.g., LSAI is serving library documentation from a remote code repository).
+
+**Input:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `symbol` | string | yes | Symbol name (class, method, function, enum, etc.) |
+| `file` | string | no | File path to narrow scope (relative) |
+
+**Data Contract:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | yes | Symbol name |
+| `kind` | yes | `class`, `method`, `function`, `enum`, `property`, `field`, etc. |
+| `signature` | yes | Full declaration signature |
+| `file` | yes | Relative file path |
+| `line` | yes | Line number (1-based) |
+| `col` | yes | Column number (1-based) |
+| `source` | yes | Complete source code of the symbol body |
+
+When multiple symbols match the name, implementations SHOULD prefer concrete implementations over abstract/interface declarations.
+
+**Example output (CompactText):**
+```
+Services/UserService.cs:14 class UserService [public class UserService : IUserService]
+public class UserService : IUserService
+{
+    private readonly List<User> _users = new();
+
+    public User? GetById(int id) => _users.FirstOrDefault(u => u.Id == id);
+    public IReadOnlyList<User> GetAll() => _users.AsReadOnly();
+    public void Add(User user) => _users.Add(user);
+    public bool Remove(int id) => _users.RemoveAll(u => u.Id == id) > 0;
+}
+```
+
+**Example — method-level extraction (77% token savings vs file read):**
+```
+Services/UserService.cs:18 method GetById [public User? GetById(int id)]
+public User? GetById(int id) => _users.FirstOrDefault(u => u.Id == id);
+```
+
+**Token savings (measured):**
+
+| Symbol Type | Source Size | File Size | Savings |
+|-------------|:----------:|:---------:|:-------:|
+| Method | 138 chars | 593 chars | **77%** |
+| Function | 180 chars | 1129 chars | **84%** |
+| Enum | 69 chars | 1129 chars | **94%** |
+| Class (small) | 284 chars | 828 chars | **66%** |
+
+Method and function-level extraction provides the highest savings. For small single-class files, savings are moderate. The real value is in multi-class files and when the AI has no file access.
+
+**Tier:** 1 (required)
+
+---
+
 ### Workspace & Meta Tools
 
 These tools manage workspace lifecycle. They are not part of the semantic tool spec but are required for any LSAI server implementation.
@@ -601,11 +665,11 @@ Capability discovery. No input.
 lsai v0.5.0
 protocol: LSAI/1.2
 plugins:
-  roslyn-csharp  tier 3  [C#]          11 tools
-  lsp-python     tier 2  [Python]       9 tools
-  lsp-typescript tier 2  [TypeScript]   9 tools
-  lsp-javascript tier 2  [JavaScript]   9 tools
-  lsp-java       tier 2  [Java]         9 tools
+  roslyn-csharp  tier 3  [C#]          12 tools
+  lsp-python     tier 2  [Python]      10 tools
+  lsp-typescript tier 2  [TypeScript]  10 tools
+  lsp-javascript tier 2  [JavaScript]  10 tools
+  lsp-java       tier 2  [Java]        10 tools
 workspaces:
   ws-abc123 | C#         | EFine.sln        | 142 files
   ws-def456 | Python     | /path/to/project | 23 files
@@ -696,7 +760,7 @@ These are upstream LSP server behaviors, not LSAI limitations:
 1. Create an LSP language config JSON (server command, args, file extensions)
 2. Deploy language server binary
 3. Register in plugin directory
-4. All 11 semantic tools work automatically through the LSP bridge
+4. All 12 semantic tools work automatically through the LSP bridge
 
 ---
 
@@ -704,7 +768,7 @@ These are upstream LSP server behaviors, not LSAI limitations:
 
 | Tier | Tools | Minimum Backend |
 |------|-------|-----------------|
-| **1** | search, info (basic), usages, rename, diagnostics, outline, deps | Any LSP server |
+| **1** | search, info (basic), usages, rename, diagnostics, outline, deps, source | Any LSP server |
 | **2** | + callers, callees, hierarchy, info (extended), deps (with files) | LSP 3.17+ |
 | **3** | + impact (full), info (complete), cross-project | Native compiler API |
 
@@ -720,7 +784,7 @@ These are upstream LSP server behaviors, not LSAI limitations:
     "search": true, "info": "full", "usages": true,
     "callers": true, "callees": true, "hierarchy": true,
     "impact": true, "rename": true, "diagnostics": true,
-    "outline": true, "deps": true
+    "outline": true, "deps": true, "source": true
   },
   "backend": "roslyn-native"
 }
@@ -736,7 +800,7 @@ These are upstream LSP server behaviors, not LSAI limitations:
     "search": true, "info": "basic", "usages": true,
     "callers": true, "callees": true, "hierarchy": false,
     "impact": "degraded", "rename": true, "diagnostics": true,
-    "outline": true, "deps": true
+    "outline": true, "deps": true, "source": true
   },
   "backend": "pyright-lsp"
 }
@@ -750,7 +814,7 @@ LSAI is an MCP server. It defines tool semantics and data contracts, not transpo
 
 ```
 AI Agent ──MCP──> LSAI Server ──native/lsp──> Compiler / Language Server
-                  (15 tools)                   (Roslyn, Pyright, tsserver, jdtls)
+                  (16 tools)                   (Roslyn, Pyright, tsserver, jdtls)
 ```
 
 ---
@@ -766,6 +830,8 @@ AI Agent ──MCP──> LSAI Server ──native/lsp──> Compiler / Languag
 | **LSP limitations** | Not documented | Per-language limitation table | Transparency |
 | **Plugin manifest** | Single example | Multiple examples (native + LSP bridge) | Multi-language clarity |
 | **Outline kinds** | 8 kinds | 12 kinds (added `function`, `variable`, `enum`, `enumMember`) | Multi-language symbols |
+| **Source tool** | Not available | Tool 12: `source` — symbol-level source extraction | Focused code inspection without file read |
+| **Semantic tools** | 11 | 12 (added `source`) | Token-efficient source access |
 | **Protocol version** | LSAI/1.1 | LSAI/1.2 | Semantic versioning |
 
 ---
@@ -774,7 +840,7 @@ AI Agent ──MCP──> LSAI Server ──native/lsp──> Compiler / Languag
 
 - **LSAI/1.0** — Initial spec. 11 tools, 3 tiers, pipe-delimited format.
 - **LSAI/1.1** — Format-agnostic, data contracts, enriched fields.
-- **LSAI/1.2** — This document. Multi-language, 6 output formats, empirical benchmarks, workspace tools.
+- **LSAI/1.2** — This document. Multi-language, 12 semantic tools (added `source`), 6 output formats, empirical benchmarks, workspace tools.
 - Future versions add tools, never remove. Tiers may be extended.
 
 ---

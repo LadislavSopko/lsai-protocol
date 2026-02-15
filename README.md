@@ -69,7 +69,7 @@ Even vs semantically correct Raw LSP JSON (not dumb text grep), LSAI's compact f
 
 ## Tools
 
-LSAI defines 11 semantic tools organized in 3 capability tiers, plus 4 workspace/meta tools. All tools operate through MCP (Model Context Protocol) with the `lsai_` prefix.
+LSAI defines 12 semantic tools organized in 3 capability tiers, plus 4 workspace/meta tools. All tools operate through MCP (Model Context Protocol) with the `lsai_` prefix.
 
 ### Semantic Tools (Protocol-defined)
 
@@ -86,6 +86,7 @@ LSAI defines 11 semantic tools organized in 3 capability tiers, plus 4 workspace
 | `callees` | 2 | What does this method call? Call graph downward | `callHierarchy/outgoingCalls` |
 | `hierarchy` | 2 | Inheritance tree: base types, interfaces, derived types | `typeHierarchy` |
 | `impact` | 3 | Composite: usages + transitive callers + affected tests + risk | No LSP equivalent |
+| `source` | 1 | Get symbol source code — method body, class definition | `definition` + file read (2 calls) |
 
 ### Workspace & Meta Tools
 
@@ -98,7 +99,7 @@ LSAI defines 11 semantic tools organized in 3 capability tiers, plus 4 workspace
 
 ### Tools With No Grep Equivalent
 
-6 out of 11 semantic tools provide capabilities that text search **cannot replicate**:
+7 out of 12 semantic tools provide capabilities that text search **cannot replicate**:
 
 | Tool | What It Does | Grep Alternative? |
 |------|-------------|-------------------|
@@ -108,6 +109,7 @@ LSAI defines 11 semantic tools organized in 3 capability tiers, plus 4 workspace
 | **Hierarchy** | Base types, interfaces, derived types | `class X(Y)` regex — misses interfaces, derived |
 | **Impact** | Usages + callers + affected tests in one call | 3+ Grep queries, still misses callers |
 | **Deps** | Project dependencies and import graph | `<PackageReference` regex — XML noise |
+| **Source** | Focused symbol source extraction (method body only) | Grep finds location, but must still read entire file |
 
 ---
 
@@ -134,7 +136,7 @@ Plugins declare their tier. The AI adapts to what's available.
 
 | Tier | What's included | Minimum backend requirement |
 |------|----------------|---------------------------|
-| **Tier 1** | search, info (basic), usages, rename, diagnostics, outline, deps | Any language server or LSP bridge |
+| **Tier 1** | search, info (basic), usages, rename, diagnostics, outline, deps, source | Any language server or LSP bridge |
 | **Tier 2** | + callers, callees, hierarchy, info (extended), deps (with files) | LSP 3.17+ with call hierarchy support |
 | **Tier 3** | + impact (full analysis), info (complete), cross-project queries | Native compiler API (Roslyn, rustc, tsc) |
 
@@ -208,8 +210,8 @@ VS-MCP is the production system that validated LSAI's core thesis: compiler sema
 | **Tier** | 3 (C#) / 2 (Python, TypeScript, JavaScript, Java) |
 | **Languages** | 5: C# (Roslyn), Python (Pyright), TypeScript, JavaScript (tsserver), Java (jdtls) |
 | **Transport** | HTTP (Streamable HTTP via MCP SDK) |
-| **Tools** | 15 MCP tools (11 semantic + 3 workspace + 1 meta) |
-| **Tests** | 465 unit tests + 15 E2E integration tests |
+| **Tools** | 16 MCP tools (12 semantic + 3 workspace + 1 meta) |
+| **Tests** | 463 unit tests + 15 E2E integration tests |
 | **Output formats** | 6 profiles (CompactText, CompactTextVerbose, TurboCompact, GrepOutput, CompilerOutput, LanguageSyntax) |
 | **Deployment** | Docker (1.4 GB image, all 5 languages included) or self-hosted |
 
@@ -237,12 +239,17 @@ Every existing tool has at least one critical gap that LSAI addresses.
 
 ---
 
-## Specification
+## Documentation
 
-The full protocol specification is in [`spec/LSAI-v1.2.md`](spec/LSAI-v1.2.md).
+| Document | Audience | Description |
+|----------|----------|-------------|
+| [`spec/LSAI-v1.2.md`](spec/LSAI-v1.2.md) | Implementers | Full protocol specification — 12 semantic tools, data contracts, tiers |
+| [`USAGE-GUIDE.md`](USAGE-GUIDE.md) | AI agents | How to use LSAI tools effectively — workflows, token tips, tool selection |
 
-It defines:
-- 11 semantic tool definitions with input parameters and data contracts
+### Specification
+
+The full protocol specification defines:
+- 12 semantic tool definitions with input parameters and data contracts
 - 6 output format profiles
 - Capability tier system and plugin manifests
 - Multi-language plugin architecture
@@ -257,7 +264,7 @@ LSAI is an open protocol. Implementations in any language are welcome.
 
 To implement an LSAI-compliant server:
 1. Read the [spec](spec/LSAI-v1.2.md)
-2. Implement Tier 1 tools (7 tools) as MCP tools with the `lsai_` prefix
+2. Implement Tier 1 tools (8 tools) as MCP tools with the `lsai_` prefix
 3. Declare your plugin's tier via the `server` meta-tool
 4. Use relative paths, include summary counts, provide full signatures in outlines
 
