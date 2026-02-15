@@ -1,18 +1,51 @@
 # Zerox.Lsai — Roadmap & Vision
 
-> Document for project context. Last updated: 2026-02-08
+> Document for project context. Last updated: 2026-02-15
 
 ---
 
-## Current State (v0.1 — Working Prototype)
+## Current State (v0.5 — Multi-Language Production)
 
 - 15 MCP tools (11 semantic + 3 workspace + 1 meta)
-- 313 tests across 3 test projects
-- Roslyn plugin: full Tier 3 C# support
-- Streamable HTTP transport
-- Plugin architecture: subfolder deploy + deps.json convention
-- Docker + self-contained publish
-- Measured token savings: 41-86% vs grep+read approach
+- 5 languages: C# (Roslyn), Python (Pyright), TypeScript (tsserver), JavaScript (tsserver), Java (jdtls)
+- 465 unit tests + 15 E2E integration tests across 5 languages
+- 6 output format profiles (CompactText, CompactTextVerbose, TurboCompact, GrepOutput, CompilerOutput, LanguageSyntax)
+- Plugin architecture: Roslyn native (Tier 3) + LSP bridge (Tier 2) for all other languages
+- Streamable HTTP transport via MCP SDK
+- Docker packaging: 1.4 GB image with all 5 languages
+- Measured token savings: **81.2% search, 86.9% usages** vs grep (46 symbols, 5 languages)
+- Measured token savings: **69-75%** vs raw LSP JSON (same semantic data, compact format)
+
+---
+
+## Completed Phases
+
+### Phase 5: Multi-Language Support (COMPLETE — Feb 2026)
+
+All 5 target languages are fully integrated and tested:
+
+| Language | Engine | Plugin Type | Tier | E2E Tests |
+|----------|--------|-------------|:----:|:---------:|
+| **C#** | Roslyn | Native compiler API | 3 | 5/5 PASS |
+| **Python** | Pyright | LSP bridge (StreamJsonRpc) | 2 | 5/5 PASS |
+| **TypeScript** | tsserver | LSP bridge (StreamJsonRpc) | 2 | 4/4 PASS |
+| **JavaScript** | tsserver | LSP bridge (StreamJsonRpc) | 2 | 1/1 PASS |
+| **Java** | Eclipse JDT (jdtls) | LSP bridge (StreamJsonRpc) | 2 | 5/5 PASS |
+
+**Key technical decisions:**
+- OmniSharp removed, replaced with StreamJsonRpc + own LSP types (LspTypes.cs, 35+ types)
+- Deterministic workspace readiness: AsyncReady config per language (Java uses background init, others block)
+- LSP capabilities handshake: explicit `workspace.symbol` declaration required by Pyright
+
+**Token savings per language (Search, vs Grep):**
+- C#: 92.9% | Python: 63.5% | TypeScript: 91.6% | JavaScript: 99.3% | Java: 55.8%
+
+### Phase 8: Docker Packaging (COMPLETE — Feb 2026)
+
+- 3-stage Dockerfile: jdtls download → .NET build → runtime (aspnet:10.0 + Node.js 22 + JDK 21)
+- Single 1.4 GB image with all 5 languages
+- All 15 MCP tools verified in Docker
+- Compose files for both build-from-source and run-from-image
 
 ---
 
@@ -87,7 +120,7 @@ Don't recompile every time. Serialize the semantic index (symbols, call graph, h
 | Cross-reference map (usage locations + context) | ~5-20 MB | `usages`, `impact` ready |
 | Diagnostic snapshot | ~0.1-1 MB | `diagnostics` instant |
 
-**Total: ~10-40 MB per repo** (estimated for medium-large .NET repos)
+**Total: ~10-40 MB per repo** (estimated for medium-large repos)
 
 ### Cache Strategy
 
@@ -105,7 +138,7 @@ Cache invalidation:
 
 ```
 Level 1: In-memory (current session)
-    - Already loaded Roslyn workspace
+    - Already loaded workspace
     - Fastest, lost on server restart
 
 Level 2: Local disk cache
@@ -187,36 +220,21 @@ Private repos: NEVER shared. Local cache only.
 | Tier | What | Price |
 |------|------|-------|
 | **Free** | Local indexing, local cache only | $0 |
-| **Pro** | Shared index access: top 1000 .NET/Python/TS libraries pre-indexed | $29/mo |
+| **Pro** | Shared index access: top 1000 libraries pre-indexed (5 languages) | $29/mo |
 | **Team** | Pro + private shared cache within organization | $99/mo |
 | **Enterprise** | Self-hosted shared index server | Custom |
 
 ### Pre-Indexed Libraries (Initial Set)
 
-**.NET ecosystem:**
-- dotnet/runtime, dotnet/aspnetcore, dotnet/efcore
-- Newtonsoft.Json, MediatR, AutoMapper, FluentValidation
-- Serilog, Polly, Dapper, MassTransit
-- xUnit, NSubstitute, FluentAssertions
+**.NET**: dotnet/runtime, dotnet/aspnetcore, dotnet/efcore, Newtonsoft.Json, MediatR, AutoMapper, FluentValidation, Serilog, Polly, Dapper, MassTransit, xUnit, NSubstitute, FluentAssertions
 
-**Future (other languages):**
-- Python: requests, fastapi, django, sqlalchemy, pytest
-- TypeScript: react, next.js, express, prisma, zod
-- Rust: tokio, serde, actix-web, diesel
+**Python**: requests, fastapi, django, sqlalchemy, pytest, pydantic, flask, celery
 
-### Revenue Projection
+**TypeScript/JavaScript**: react, next.js, express, prisma, zod, angular, vue, nestjs
 
-If 0.1% of GitHub's 100M+ developers subscribe to Pro:
-- 100,000 × $29/mo = **$2.9M/month**
-- Growing as more languages and repos are added
+**Java**: spring-boot, spring-framework, hibernate, jackson, junit5, mockito
 
-### Competitive Position
-
-Nobody has this:
-- **GitHub** has the repos but no semantic index for AI
-- **Sourcegraph** has code search but not AI-optimized
-- **NuGet/npm** have packages but no semantic intelligence
-- **LSAI** = semantic index + AI-native protocol + growing cache
+**Future**: Rust (tokio, serde, actix-web), Go (gin, gorm, cobra)
 
 ---
 
@@ -245,26 +263,22 @@ LSAI resolves cross-workspace type references and shows impact across boundaries
 
 ---
 
-## Phase 5: Multi-Language (Future)
+## Phase 6: Additional Languages (Future)
 
-### Plugin Priority
+With the LSP bridge plugin architecture proven for 4 languages, adding new ones is mechanical:
 
-Based on market demand and ecosystem maturity:
-
-| Priority | Language | Plugin Backend | Tier Target |
-|----------|----------|---------------|-------------|
-| 1 (done) | C#, F# | Roslyn | 3 |
-| 2 | TypeScript/JS | tsserver / typescript | 2 |
-| 3 | Python | Pyright | 2 |
-| 4 | Java | Eclipse JDT | 2 |
-| 5 | Rust | rust-analyzer | 2 |
-| 6 | Go | gopls | 2 |
+| Priority | Language | Plugin Backend | Tier Target | Effort |
+|----------|----------|---------------|:-----------:|--------|
+| 1 | **Rust** | rust-analyzer | 2 | Medium |
+| 2 | **Go** | gopls | 2 | Medium |
+| 3 | **C/C++** | clangd | 2 | Medium |
+| 4 | **Kotlin** | kotlin-language-server | 2 | Medium |
 
 ### Plugin Development Kit
 
 Provide a template + test suite for community plugin development:
 - `ILsaiPlugin` interface (already defined in Core)
-- Reference test suite: "your plugin must pass these 100 tests to be Tier N compliant"
+- Reference test suite: "your plugin must pass these tests to be Tier N compliant"
 - Plugin submission to registry
 
 ---
@@ -272,7 +286,8 @@ Provide a template + test suite for community plugin development:
 ## Summary: The Evolution
 
 ```
-NOW:        Local semantic server for your C# code
+DONE:       Multi-language semantic server (C#, Python, TS, JS, Java)
+DONE:       Docker packaging, 6 output formats, 465+ tests
                     ↓
 PHASE 1:    + Load any git repo as read-only workspace
                     ↓
@@ -282,7 +297,7 @@ PHASE 3:    + Shared cloud index → global semantic knowledge base
                     ↓
 PHASE 4:    + Cross-workspace queries → "what breaks if library X changes?"
                     ↓
-PHASE 5:    + Multi-language → Python, TS, Rust, Java, Go
+PHASE 6:    + More languages → Rust, Go, C++, Kotlin
 ```
 
 Each phase builds on the previous one. Each phase adds value. Each phase is independently useful.
