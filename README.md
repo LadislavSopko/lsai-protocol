@@ -183,6 +183,28 @@ LSAI uses a plugin architecture to support multiple languages through a single e
 
 ---
 
+## Prior Art
+
+Every existing tool has at least one critical gap that LSAI addresses.
+
+| Tool | Semantic Analysis | Multi-Language | AI-Native Output | Standalone (no IDE) | Composite Queries |
+|------|:-:|:-:|:-:|:-:|:-:|
+| **LSAI** | Yes (compiler-level) | Yes (5 languages) | Yes (2 format profiles) | Yes | Yes (`impact`) |
+| **GitHub MCP Server** | No (file/PR/issue operations) | N/A | No (raw API JSON) | Yes | No |
+| **Serena** | Partial (LSP bridge) | Yes (via LSP) | No (verbose LSP JSON) | Yes | No |
+| **JetBrains MCP** | Yes (IDE internals) | Yes (via IDE) | No (IDE-centric format) | No (requires running IDE) | No |
+| **tree-sitter tools** | No (syntax only, no types) | Yes (grammar-based) | Partial | Yes | No |
+| **LSP MCP bridges** | Yes (via LSP) | Yes (one per language) | No (raw LSP protocol) | Yes | No |
+
+**Key differentiators:**
+- **GitHub MCP Server** — operates on repositories and issues, not code semantics. Different domain entirely.
+- **Serena** — wraps LSP, inherits LSP's chattiness and verbose output. No composite queries, no token optimization.
+- **JetBrains MCP** — powerful but requires a running JetBrains IDE. Not standalone, not deployable to CI/headless environments.
+- **tree-sitter tools** — fast syntax parsing but no type resolution. Can't answer "who implements this interface?" or "what breaks if I rename this?".
+- **Generic LSP bridges** — expose raw LSP protocol to AI, which is verbose, cursor-centric, and requires multiple round-trips for basic questions.
+
+---
+
 ## Documentation
 
 | Document | Audience | Description |
