@@ -15,13 +15,14 @@
 2. **Search for symbols** — find what you're looking for:
    ```
    lsai_search(workspaceId="ws-abc123", query="UserService")
-   → Services/UserService.cs:14 class UserService
+   → src/Services/UserService.cs:14 class UserService public MyApp.Services
+     base:BaseService implements:IUserService 6m
    ```
 
 3. **Inspect implementation** — get the source code:
    ```
    lsai_source(workspaceId="ws-abc123", symbolName="GetById")
-   → Services/UserService.cs:18 method GetById [public User? GetById(int id)]
+   → src/Services/UserService.cs:18 method GetById
      public User? GetById(int id) => _users.FirstOrDefault(u => u.Id == id);
    ```
 
@@ -132,7 +133,7 @@ usages("_repo")                → where is it used?
 ### 2. Use Outline Instead of File Read for Structure
 
 **Bad:** Read entire file to understand its structure
-**Good:** `outline(file="Services/UserService.cs")` → member list with signatures
+**Good:** `outline(file="Services/UserService.cs")` → member list with signatures, collapsed properties
 
 ### 3. Use Source for Focused Inspection
 
@@ -147,12 +148,11 @@ usages("_repo")                → where is it used?
 
 **Rule of thumb:** If you need ONE symbol from a multi-symbol file, use `source`. If you need the entire file, use `Read`.
 
-### 4. Use CompactText Format (Default)
+### 4. Use Compact Format (Default)
 
-All LSAI tools default to CompactText — the lowest token format. Only switch to a different format when you need:
-- `CompactTextVerbose` — code context lines alongside results
-- `LanguageSyntax` — language-native output (useful for presenting code to users)
-- `GrepOutput` — familiar `file:line:col: match` format
+All LSAI tools default to Compact — the lowest token format. Only switch to Verbose when you need:
+- Code context lines alongside results (to see HOW a symbol is used)
+- Full signatures in callers/callees
 
 ### 5. Chain Tools Efficiently
 
@@ -174,12 +174,8 @@ All tools accept an optional `outputFormat` parameter:
 
 | Format | When to Use |
 |--------|-------------|
-| **CompactText** (default) | General use. Lowest token cost |
-| **CompactTextVerbose** | When you need source line context alongside results |
-| **TurboCompact** | Bulk queries where you only need names and positions |
-| **GrepOutput** | If your workflow expects `file:line:col: match` format |
-| **CompilerOutput** | Diagnostics in compiler-native format |
-| **LanguageSyntax** | When presenting code structure to users |
+| **Compact** (default) | General use. Lowest token cost. No code context. |
+| **Verbose** | When you need source line context alongside results |
 
 ---
 

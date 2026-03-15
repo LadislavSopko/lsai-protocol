@@ -1,20 +1,21 @@
 # Zerox.Lsai — Roadmap & Vision
 
-> Document for project context. Last updated: 2026-02-15
+> Document for project context. Last updated: 2026-03-15
 
 ---
 
-## Current State (v0.5 — Multi-Language Production)
+## Current State (v1.0.60 — Production)
 
-- 15 MCP tools (11 semantic + 3 workspace + 1 meta)
+- 20 MCP tools (12 semantic + 3 workspace + 1 meta + 4 composite)
 - 5 languages: C# (Roslyn), Python (Pyright), TypeScript (tsserver), JavaScript (tsserver), Java (jdtls)
-- 465 unit tests + 15 E2E integration tests across 5 languages
-- 6 output format profiles (CompactText, CompactTextVerbose, TurboCompact, GrepOutput, CompilerOutput, LanguageSyntax)
-- Plugin architecture: Roslyn native (Tier 3) + LSP bridge (Tier 2) for all other languages
+- 413+ unit tests + 16 E2E integration tests across 5 languages
+- 2 output format profiles (Compact, Verbose) — optimized from 6 redundant formats
+- Plugin architecture: Roslyn native (Tier 3) + LSP bridge (Tier 2) + SCIP (Tier 2)
 - Streamable HTTP transport via MCP SDK
-- Docker packaging: 1.4 GB image with all 5 languages
-- Measured token savings: **81.2% search, 86.9% usages** vs grep (46 symbols, 5 languages)
-- Measured token savings: **69-75%** vs raw LSP JSON (same semantic data, compact format)
+- Docker packaging: 4 combo images (web 877MB, dotnet 1.82GB, jvm 1.44GB, full 2.38GB)
+- Measured token savings: **~93% vs grep** (25+ queries, 5 languages, 10 tools)
+- Measured token savings: **37% improvement** over previous CompactText format
+- Measured token savings: **69-75%** vs raw LSP JSON
 
 ---
 
@@ -287,7 +288,8 @@ Provide a template + test suite for community plugin development:
 
 ```
 DONE:       Multi-language semantic server (C#, Python, TS, JS, Java)
-DONE:       Docker packaging, 6 output formats, 465+ tests
+DONE:       Docker packaging (4 combo images), 2 output formats (optimized from 6), 413+ tests
+DONE:       Output format optimization: 93% vs grep, 37% improvement over v1.2
                     ↓
 PHASE 1:    + Load any git repo as read-only workspace
                     ↓
