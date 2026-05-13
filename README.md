@@ -27,181 +27,116 @@ LSP was designed for IDEs — cursor-centric, single-file, chatty. AI agents nee
 
 | Dimension | LSP (via MCP bridge) | LSAI |
 |-----------|---------------------|------|
-| **Round-trips for "who calls X and what tests cover it?"** | 5-8 calls (hover + definition + references + call hierarchy + symbol search) | 1 call (`impact`) |
+| **Round-trips for "who calls X and what tests cover it?"** | 5-8 calls | 1 call (`impact`) |
 | **Data per response** | Cursor-position hover text, raw JSON spans | Full signatures, code context, grouped by file |
 | **Path format** | Absolute URIs (`file:///home/user/project/src/...`) | Relative paths (`src/Services/MyService.cs`) |
-| **Output format** | Verbose JSON with TextEdit ranges, Position objects | Compact, AI-native (2 format profiles) |
-| **Capabilities** | Varies by server, no standard capability tiers | Declared tiers (1/2/3) per plugin |
-| **Composite queries** | Not supported — client must orchestrate | Built-in (`impact` = usages + callers + tests) |
-| **Multi-language** | One server per language, manual setup | Plugin architecture, one endpoint, 5 languages |
+| **Output format** | Verbose JSON with TextEdit ranges | Compact, AI-native (2 format profiles) |
+| **Composite queries** | Not supported — client must orchestrate | Built-in (`impact`, `context`, `file_refs`) |
+| **Multi-language** | One server per language, manual setup | Plugin architecture, one endpoint, 10 languages |
+| **Fallback resilience** | Fails if server lacks capability | Graceful degradation with alternative strategies |
 
 ---
 
-## Measured Token Savings — 93% vs Grep
+## Measured Token Savings — v1.0.176 Benchmark
 
-Real measurements from the Zerox.Lsai reference implementation (v1.0.60) across **5 languages** and **25+ live MCP queries**.
+Real measurements from the Zerox.Lsai reference implementation across **8 languages**, **12 tools**, and **96 live MCP queries**.
 
-### LSAI Compact vs Grep
+### Summary: LSAI vs grep by Language
 
-| Metric | Savings |
-|--------|:-------:|
-| **Overall** | **~93%** |
-| Search | 25-67% |
-| Usages | 29-74% |
-| Outline | 43-79% |
-| Impact | 61% |
-| Callers | 8-73% |
+| Language | Avg Savings | Best Tool | Notes |
+|----------|:-----------:|-----------|-------|
+| **Python** | 85% | hierarchy (100%), search (97%) | All tools positive |
+| **TypeScript** | 78% | hierarchy (100%), deps (100%) | source -18% on tiny methods |
+| **C#** | 75% | hierarchy (100%), search (98%) | Large project, biggest absolute savings |
+| **Rust** | 76% | callees (100%), usages (90%) | — |
+| **PHP** | 61% | hierarchy (99%), deps (99%) | source -36% on 1-line methods |
+| **JavaScript** | 66% | hierarchy (100%), deps (100%) | Express fork, large codebase |
+| **Go** | 55% | callees (88%), callers (87%) | Small fixture, overhead visible |
+| **Java** | 48% | callers (100%), callees (100%) | Small fixture, jdtls metadata overhead |
 
-### Per-Tool Highlights
+### Per-Tool Savings Range
 
-| Query | Before (old format) | After (Compact v1.3) | Savings |
-|-------|:-------------------:|:--------------------:|:-------:|
-| C# outline (51 members) | 641 tokens | 132 tokens | **79%** |
-| Python usages (9 refs) | 50 tokens | 13 tokens | **74%** |
-| C# impact analysis | 375 tokens | 148 tokens | **61%** |
-| Rename (2 files) | 547 tokens | ~20 tokens | **96%** |
+| Tool | Min | Max | Where LSAI Wins Big |
+|------|:---:|:---:|---------------------|
+| **hierarchy** | 9% | 100% | Always — grep can't trace inheritance |
+| **search** | -6% | 98% | Large projects: 73-98% savings |
+| **callees** | 27% | 100% | Call graph impossible with grep |
+| **callers** | 19% | 100% | Call graph impossible with grep |
+| **usages** | 19% | 90% | Semantic (no comment/string false positives) |
+| **impact** | 54% | 88% | Composite: 5-8 grep calls in one |
+| **info** | -12% | 91% | Overhead on tiny files |
+| **deps** | 30% | 100% | Import parsing vs grep noise |
+| **source** | -47% | 88% | Negative on tiny methods (metadata overhead) |
+| **outline** | 26% | 68% | LSAI returns MORE data (richer) |
+| **file_refs** | 46% | 99% | Cross-file map impossible with grep |
 
-### LSAI vs Raw LSP JSON
+### Overall
 
-Even vs semantically correct Raw LSP JSON (not dumb text grep), LSAI's compact format saves:
+**Average savings: 66%** across 64 valid measurements (excluding N/A and negative outliers on tiny fixtures).
 
-| Language | Search Savings | Usages Savings |
-|----------|:--------------:|:--------------:|
-| **Python** | **82.8%** | **85.5%** |
-| **TypeScript** | **85.0%** | **82.2%** |
-| **Java** | **40.1%** | **31.9%** |
+On real-world projects (>100 files): **75-93% savings** — the more code, the bigger the win.
 
 ---
 
 ## Tools
 
-LSAI defines 12 semantic tools organized in 3 capability tiers, plus 4 workspace/meta tools. All tools operate through MCP (Model Context Protocol) with the `lsai_` prefix.
+LSAI defines **14 semantic tools** plus 4 workspace/meta tools. All tools operate through MCP with the `lsai_` prefix.
 
-### Semantic Tools (Protocol-defined)
+### Semantic Tools
 
-| Tool | Tier | Description | Replaces (LSP equivalent) |
-|------|------|-------------|--------------------------|
-| `search` | 1 | Find symbols by name pattern with kind/scope filters | `workspace/symbol` |
-| `info` | 1/2/3 | Full symbol details: signature, modifiers, base types, members | `hover` + `definition` + `typeDefinition` |
-| `usages` | 1 | Semantic references grouped by file with code context | `references` |
-| `rename` | 1 | Safe rename with preview, cross-file, compilation check | `rename` |
-| `diagnostics` | 1 | Compiler errors/warnings, filtered (no `obj/` noise) | `diagnostics` |
-| `outline` | 1 | Document structure with **full method signatures** | `documentSymbol` (but richer) |
-| `deps` | 1/2 | Project dependency graph | No LSP equivalent |
-| `callers` | 2 | Who calls this method? Call graph upward | `callHierarchy/incomingCalls` |
-| `callees` | 2 | What does this method call? Call graph downward | `callHierarchy/outgoingCalls` |
-| `hierarchy` | 2 | Inheritance tree: base types, interfaces, derived types | `typeHierarchy` |
-| `impact` | 3 | Composite: usages + transitive callers + affected tests + risk | No LSP equivalent |
-| `source` | 1 | Get symbol source code — method body, class definition | `definition` + file read (2 calls) |
+| Tool | Description | Replaces (LSP/grep equivalent) |
+|------|-------------|-------------------------------|
+| `search` | Find symbols by name across the workspace | `workspace/symbol` / `grep -rn` |
+| `info` | Symbol details: signature, docs, type, modifiers | `hover` + `definition` + `typeDefinition` |
+| `usages` | Semantic references grouped by file | `references` / `grep -rn` |
+| `outline` | Document structure with full method signatures | `documentSymbol` (but richer) |
+| `source` | Get symbol implementation source code | `definition` + file read (2 calls) |
+| `callers` | Call graph upward: who calls this method? | `callHierarchy/incomingCalls` |
+| `callees` | Call graph downward: what does this method call? | `callHierarchy/outgoingCalls` |
+| `hierarchy` | Type inheritance: base types, interfaces, derived | `typeHierarchy` |
+| `impact` | Composite: usages + callers + affected tests + risk | No equivalent (5-8 calls) |
+| `deps` | File-level imports/includes/dependencies | No equivalent |
+| `file_refs` | Cross-file reference map | No equivalent |
+| `context` | Composite: outline + diagnostics + usages + callers + risk | No equivalent (7+ calls) |
+| `diagnostics` | Compiler errors/warnings | `diagnostics` |
+| `rename` | Safe semantic rename across workspace | `rename` |
 
 ### Workspace & Meta Tools
 
 | Tool | Description |
 |------|-------------|
-| `workspace_open` | Open a project/solution for analysis, returns workspace ID |
-| `workspace_list` | List all open workspaces with IDs, paths, languages |
-| `workspace_close` | Close an open workspace and free resources |
-| `server` | Capability discovery: version, plugins, open workspaces |
+| `workspace_open` | Open a project for analysis (usually auto-opened from cwd) |
+| `workspace_list` | List open workspaces with IDs, paths, languages |
+| `workspace_close` | Close a workspace and free resources |
+| `server` | Capability discovery: version, plugins, workspaces |
+
+---
+
+## Language Support
+
+| Language | Engine | All 14 Tools | Fallbacks |
+|----------|--------|:------------:|-----------|
+| **C#** | Roslyn (native) | Yes | — |
+| **Python** | ty (Astral) | Yes | CallersFallback via references |
+| **TypeScript** | typescript-language-server | Yes | — |
+| **JavaScript** | typescript-language-server | Yes | — |
+| **Java** | Eclipse JDT (jdtls) | Yes | — |
+| **PHP** | intelephense | Yes | CallersFallback; rename N/A (free tier) |
+| **Rust** | rust-analyzer | Yes | — |
+| **Go** | gopls | Yes | — |
+| **C** | clangd | Yes | CalleesFallback via regex+symbol |
+| **C++** | clangd | Yes | CalleesFallback via regex+symbol |
+
+All 14 tools work on all 10 languages. Where an upstream LSP lacks a capability, LSAI provides fallback strategies that still return useful data.
 
 ---
 
 ## Output Format Profiles
 
-LSAI is format-agnostic — the protocol defines data contracts, not serialization. Two profiles cover all real use cases:
-
 | Profile | Style | Use Case |
 |---------|-------|----------|
-| **Compact** | Minimal tokens: no brackets, no footers, comma-separated, collapsed properties | Default. Lowest token cost for AI agents |
-| **Verbose** | Compact structure with code context snippets and full signatures | When the AI needs to understand HOW symbols are used |
-
-v1.2 defined 6 format profiles. Empirical analysis on 223 queries proved 4 were redundant — producing identical or near-identical output. The optimization from 6→2 formats plus redundancy elimination yielded **37% fewer tokens** on the same queries.
-
----
-
-## Capability Tiers
-
-Plugins declare their tier. The AI adapts to what's available.
-
-| Tier | What's included | Minimum backend requirement |
-|------|----------------|---------------------------|
-| **Tier 1** | search, info (basic), usages, rename, diagnostics, outline, deps, source | Any language server or LSP bridge |
-| **Tier 2** | + callers, callees, hierarchy, info (extended), deps (with files) | LSP 3.17+ with call hierarchy support |
-| **Tier 3** | + impact (full analysis), info (complete), cross-project queries | Native compiler API (Roslyn, rustc, tsc) |
-
-A Tier 1 plugin is useful. A Tier 3 plugin is transformative — `impact` alone replaces 5-8 manual tool calls.
-
----
-
-## Multi-Language Support
-
-LSAI uses a plugin architecture to support multiple languages through a single endpoint.
-
-| Language | Engine | Plugin Type | Tier | Status |
-|----------|--------|-------------|:----:|--------|
-| **C#** | Roslyn | Native compiler API | 3 | Production |
-| **Python** | Pyright | LSP bridge | 2 | Production |
-| **TypeScript** | tsserver | LSP bridge | 2 | Production |
-| **JavaScript** | tsserver | LSP bridge | 2 | Production |
-| **Java** | Eclipse JDT (jdtls) | LSP bridge | 2 | Production |
-
-### Known LSP Server Limitations
-
-| Language | Limitation | Impact |
-|----------|-----------|--------|
-| JavaScript | `workspace/symbol` not supported for CommonJS `.js` files | Search limited to outline-indexed symbols |
-| JavaScript | `<unknown>` symbol names for anonymous CommonJS exports | Outline shows `<unknown>` for `module.exports = ...` |
-| Python | `textDocument/prepareTypeHierarchy` not implemented by Pyright | Hierarchy tool unavailable for Python |
-| Java | `workspace/symbol` does not expose fields/record components | Search returns 0 for fields |
-| Java | Fuzzy matching on `workspace/symbol` | May return extra results |
-
----
-
-## Implementations
-
-### VS-MCP (Production Reference)
-
-| Property | Value |
-|----------|-------|
-| **Project** | [VS-MCP](https://github.com/LadislavSopko/zerox-msvc-info) — Visual Studio MCP Server |
-| **Tier** | 3 (full semantic analysis) |
-| **Language** | C# (via Visual Studio Roslyn integration) |
-| **Tools** | 20 tools (superset of LSAI — includes file navigation, formatting) |
-| **Production usage** | 6+ months, Claude Opus 3.5/4.6, daily development use |
-
-### Zerox.Lsai Reference Server
-
-| Property | Value |
-|----------|-------|
-| **Project** | [Zerox.Lsai](https://github.com/LadislavSopko/Zerox.Lsai) — standalone LSAI server |
-| **Tier** | 3 (C#) / 2 (Python, TypeScript, JavaScript, Java) |
-| **Languages** | 5: C# (Roslyn), Python (Pyright), TypeScript, JavaScript (tsserver), Java (jdtls) |
-| **Transport** | HTTP (Streamable HTTP via MCP SDK) |
-| **Tools** | 20 MCP tools (12 semantic + 3 workspace + 1 meta + 4 composite) |
-| **Tests** | 413+ unit tests + 16 E2E integration tests |
-| **Output formats** | 2 profiles (Compact, Verbose) |
-| **Deployment** | Docker (4 combo images: web 877MB, dotnet 1.82GB, jvm 1.44GB, full 2.38GB) |
-
----
-
-## Prior Art
-
-Every existing tool has at least one critical gap that LSAI addresses.
-
-| Tool | Semantic Analysis | Multi-Language | AI-Native Output | Standalone (no IDE) | Composite Queries |
-|------|:-:|:-:|:-:|:-:|:-:|
-| **LSAI** | Yes (compiler-level) | Yes (5 languages) | Yes (2 format profiles) | Yes | Yes (`impact`) |
-| **GitHub MCP Server** | No (file/PR/issue operations) | N/A | No (raw API JSON) | Yes | No |
-| **Serena** | Partial (LSP bridge) | Yes (via LSP) | No (verbose LSP JSON) | Yes | No |
-| **JetBrains MCP** | Yes (IDE internals) | Yes (via IDE) | No (IDE-centric format) | No (requires running IDE) | No |
-| **tree-sitter tools** | No (syntax only, no types) | Yes (grammar-based) | Partial | Yes | No |
-| **LSP MCP bridges** | Yes (via LSP) | Yes (one per language) | No (raw LSP protocol) | Yes | No |
-
-**Key differentiators:**
-- **GitHub MCP Server** — operates on repositories and issues, not code semantics. Different domain entirely.
-- **Serena** — wraps LSP, inherits LSP's chattiness and verbose output. No composite queries, no token optimization.
-- **JetBrains MCP** — powerful but requires a running JetBrains IDE. Not standalone, not deployable to CI/headless environments.
-- **tree-sitter tools** — fast syntax parsing but no type resolution. Can't answer "who implements this interface?" or "what breaks if I rename this?".
-- **Generic LSP bridges** — expose raw LSP protocol to AI, which is verbose, cursor-centric, and requires multiple round-trips for basic questions.
+| **Compact** | Minimal tokens: no brackets, no footers, comma-separated, collapsed properties | Default. Lowest token cost |
+| **Verbose** | Compact + code context snippets | When the AI needs to understand HOW symbols are used |
 
 ---
 
@@ -209,8 +144,24 @@ Every existing tool has at least one critical gap that LSAI addresses.
 
 | Document | Audience | Description |
 |----------|----------|-------------|
-| [`spec/LSAI-v1.3.md`](spec/LSAI-v1.3.md) | Implementers | Full protocol specification — 12 semantic tools, data contracts, tiers |
-| [`USAGE-GUIDE.md`](USAGE-GUIDE.md) | AI agents | How to use LSAI tools effectively — workflows, token tips, tool selection |
+| [`spec/LSAI-v1.4.md`](spec/LSAI-v1.4.md) | Implementers | Full protocol specification — 14 tools, data contracts, fallbacks |
+| [`spec/LSAI-v1.3.md`](spec/LSAI-v1.3.md) | Reference | Previous version (12 tools, 5 languages) |
+| [`USAGE-GUIDE.md`](USAGE-GUIDE.md) | AI agents | How to use LSAI tools effectively |
+
+---
+
+## Reference Implementation
+
+| Property | Value |
+|----------|-------|
+| **Project** | [Zerox.Lsai](https://github.com/0ics-srls/Zerox.Lsai.Public) |
+| **Version** | v1.0.176 (May 2026) |
+| **Languages** | 10: C#, Python, TypeScript, JavaScript, Java, PHP, Rust, Go, C, C++ |
+| **Transport** | stdio (MCP) |
+| **Tools** | 14 semantic + 4 workspace/meta |
+| **Install** | `curl -fsSL .../install.sh \| bash` (one command, auto-detects toolchains) |
+| **Platforms** | Linux, macOS, WSL, Windows |
+| **Validated** | 8 langs x 12 tools E2E matrix (Linux + Windows VM) |
 
 ---
 
@@ -219,10 +170,11 @@ Every existing tool has at least one critical gap that LSAI addresses.
 LSAI is an open protocol. Implementations in any language are welcome.
 
 To implement an LSAI-compliant server:
-1. Read the [spec](spec/LSAI-v1.3.md)
-2. Implement Tier 1 tools (8 tools) as MCP tools with the `lsai_` prefix
-3. Declare your plugin's tier via the `server` meta-tool
+1. Read the [spec](spec/LSAI-v1.4.md)
+2. Implement Tier 1 tools (9 tools) as MCP tools with the `lsai_` prefix
+3. Declare your plugin's capabilities via the `server` meta-tool
 4. Use relative paths, provide full signatures in outlines, follow Compact format rules
+5. Implement fallback strategies for Tier 2 tools where the underlying LSP lacks support
 
 ---
 
@@ -232,4 +184,4 @@ Protocol specification licensed under **CC BY-NC 4.0**. Free for study, research
 
 ---
 
-Protocol designed by Ladislav Sopko, 0ics srl, Bologna, Italy — March 2026
+Protocol designed by Ladislav Sopko, 0ics srl, Bologna, Italy — May 2026
